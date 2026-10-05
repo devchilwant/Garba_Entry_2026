@@ -1,162 +1,114 @@
-# Society Entry Authorization v2
+# Society Entry Authorizer v4
 
-A mobile-friendly GitHub Pages application for society event entry.
+## Changes in this version
 
-## Features
+QR generation and QR scanning have been completely removed.
 
-- QR code scanning using the phone camera
-- Manual Wing + Flat fallback
-- Reads private Google Sheet through Google Apps Script
-- One Google Sheet tab per wing
-- Uses:
-  - Column B = Flat No.
-  - Column D = Amount Paid
-  - Column G = Member Count
-- Checks minimum payment
-- Records every successful entry
-- Prevents entry after the allowed member count is exhausted
-- Uses Apps Script LockService to reduce duplicate authorization when two guards scan the same flat simultaneously
-- Creates an `Entry Log` sheet automatically
+The application now uses manual:
+- Wing
+- Flat Number
+- People Entering Now
 
-## Example
+It reads from each wing sheet:
 
-Google Sheet:
+| Column | Meaning |
+|---|---|
+| B | Flat No. |
+| D | Amount Paid |
+| E | Owner / Tenant |
+| G | Member Count |
 
-| B: Flat No. | D: Amount | G: Count |
-|---|---:|---:|
-| 101 | 1800 | 4 |
-| 102 | 1800 | 2 |
+## Entry logic
 
-If Flat 101 is scanned four times:
+The application creates a separate log sheet for every calendar day.
 
-1. Entry 1 → Authorized → Remaining 3
-2. Entry 2 → Authorized → Remaining 2
-3. Entry 3 → Authorized → Remaining 1
-4. Entry 4 → Authorized → Remaining 0
-5. Entry 5 → Rejected → Maximum count reached
+Example:
 
-## QR format
+- `Entry Log - 2026-10-05`
+- `Entry Log - 2026-10-06`
+- `Entry Log - 2026-10-07`
 
-The scanner accepts any of these:
+Each log contains:
 
-### Recommended
-`A Wing|101`
+`Timestamp | Wing | Flat No. | Owner/Tenant | Allowed Members | People Entering | Previous Entered | Total Entered | Remaining`
 
-### Also accepted
-`A Wing,101`
+### Example
 
-`A Wing-101`
+Flat 101:
 
-Or JSON:
+- Allowed members = 4
+- First entry = 2
 
-`{"wing":"A Wing","flat":"101"}`
+The app records:
 
-The QR code does not need to contain payment information. The application reads the payment/member count from the Google Sheet.
+- People entering = 2
+- Total entered = 2
+- Remaining = 2
+
+Later:
+
+- People entering = 1
+
+It records:
+
+- Total entered = 3
+- Remaining = 1
+
+If somebody tries to enter 2 when only 1 remains, the app rejects the entry.
 
 ## Setup
 
-### 1. Google Sheet
+### 1. Apps Script
 
-Keep your existing sheets:
+Open your Apps Script project and replace `Code.gs` with the new `apps-script/Code.gs`.
 
-- A Wing
-- B Wing
-- C Wing
-- D Wing
-- E Wing
-- F Wing
-- G Wing
-- H Wing
-- I Wing
-- J Wing
+Set:
 
-Column B = Flat No.
-Column D = Amount
-Column G = Count
+`const SPREADSHEET_ID = "YOUR_GOOGLE_SHEET_ID";`
 
-Do not rename the sheets unless you also change the application.
+The existing spreadsheet ID you provided earlier is:
 
-### 2. Google Apps Script
+`17ZpEPxHHG5OPnx0sdKyq2dFkvOy_Q6UxzsnaCJl0TdU`
 
-Open Google Sheet → Extensions → Apps Script.
+So you can use:
 
-Copy `apps-script/Code.gs` into the Apps Script project.
+`const SPREADSHEET_ID = "17ZpEPxHHG5OPnx0sdKyq2dFkvOy_Q6UxzsnaCJl0TdU";`
 
-Change:
+### 2. Payment amount
 
-`PASTE_YOUR_GOOGLE_SHEET_ID_HERE`
-
-Example Sheet URL:
-
-`https://docs.google.com/spreadsheets/d/ABC123/edit`
-
-The ID is:
-
-`ABC123`
-
-Also check:
+The code currently uses:
 
 `const MINIMUM_AMOUNT = 1800;`
 
-If your required contribution is different, change 1800.
+Change this if your event's required amount is different.
 
-### 3. Deploy Apps Script
+### 3. Deploy/update Web App
 
-Apps Script → Deploy → New deployment → Web app
+After replacing the Apps Script code:
 
-Use:
+Deploy → Manage deployments → Edit the Web App deployment → create/update the version → Deploy.
+
+Keep:
 
 - Execute as: Me
 - Who has access: Anyone
 
-Deploy and copy the Web App URL.
-
-### 4. Configure frontend
+### 4. GitHub website
 
 Open `app.js` and replace:
 
 `PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE`
 
-with your Apps Script Web App URL.
+with your existing Web App URL.
 
-### 5. GitHub Pages
+Then push the files to your GitHub Pages repository.
 
-Create a GitHub repository and upload:
+## Important behavior
 
-- index.html
-- styles.css
-- app.js
-- README.md
-- apps-script/Code.gs
+The daily log is based on the spreadsheet/script timezone. If your spreadsheet timezone is India Standard Time, daily logs will follow IST.
 
-Then:
+The application does NOT reset the main Google Sheet count. It only calculates "entered today" from that day's log sheet.
 
-Repository → Settings → Pages
+When the next day starts, a new log sheet is automatically created and that day's entered count starts from zero.
 
-Select:
-
-- Deploy from a branch
-- Branch: main
-- Folder: / (root)
-
-Your site will be available at a GitHub Pages URL.
-
-## QR generation
-
-Create one QR per flat containing:
-
-`A Wing|101`
-
-`A Wing|102`
-
-etc.
-
-You can create these QR codes in bulk later from your Google Sheet.
-
-## Important
-
-The first scan of a flat records an entry. Therefore, use this application for the actual gate entry check.
-
-If the same person scans the same QR again, it counts as another entry. If you want a "family token" workflow instead (one scan opens a screen where the guard selects 1/2/3/4 members entering at once), that can be added.
-
-For better security, a future version can add a guard PIN/login and an event-specific reset so the same Google Sheet can be reused for multiple events.
+No QR code functionality is included in this version.

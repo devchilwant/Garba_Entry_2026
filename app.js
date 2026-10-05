@@ -1,32 +1,15 @@
-// Put your deployed Google Apps Script Web App URL here.
-const API_URL = "https://script.google.com/macros/s/AKfycbzLKsU6C_DUd6E8RhdaD1Qry9uJmNAvZHxWipUGD3jBW926MmCF8u94N_RTxex0OY8kcw/exec";
+// Paste your deployed Google Apps Script Web App URL here.
+const API_URL = "https://script.google.com/macros/s/AKfycbznlkXmy90QeWI8lv9PMiCb2XzIu4CoSXnV4GWy9h6c6nUf7XFOLhIyI5E8XFP1hcUUrA/exec";
 
-let scanner = null;
-let scannerRunning = false;
 let requestCounter = 0;
 
-const scanTab = document.getElementById("scanTab");
-const manualTab = document.getElementById("manualTab");
-const scannerPanel = document.getElementById("scannerPanel");
-const lookupForm = document.getElementById("lookupForm");
-const stopScannerBtn = document.getElementById("stopScannerBtn");
-const resultEl = document.getElementById("result");
-const messageEl = document.getElementById("message");
-const checkBtn = document.getElementById("checkBtn");
+const form = document.getElementById("checkForm");
 const wingEl = document.getElementById("wing");
 const flatEl = document.getElementById("flat");
-
-function showMessage(text) {
-  messageEl.textContent = text;
-  messageEl.classList.remove("hidden");
-}
-function hideMessage() { messageEl.classList.add("hidden"); }
-
-function resetResult() {
-  resultEl.classList.add("hidden");
-  resultEl.classList.remove("authorized", "denied");
-  resultEl.innerHTML = "";
-}
+const peopleEl = document.getElementById("people");
+const button = document.getElementById("authorize");
+const msgEl = document.getElementById("msg");
+const resultEl = document.getElementById("result");
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({
@@ -34,58 +17,38 @@ function escapeHtml(value) {
   }[c]));
 }
 
-function renderResult(data) {
-  resultEl.classList.remove("hidden", "authorized", "denied");
-
-  if (!data.found) {
-    resultEl.classList.add("denied");
-    resultEl.innerHTML = `
-      <h2>❌ Entry Not Authorized</h2>
-      <p>Flat <strong>${escapeHtml(data.flat)}</strong> was not found in ${escapeHtml(data.wing)}.</p>`;
-    return;
-  }
-
-  if (!data.authorized) {
-    resultEl.classList.add("denied");
-    resultEl.innerHTML = `
-      <h2>❌ Entry Not Authorized</h2>
-      <div class="data-row"><span>Wing</span><strong>${escapeHtml(data.wing)}</strong></div>
-      <div class="data-row"><span>Flat</span><strong>${escapeHtml(data.flat)}</strong></div>
-      <div class="data-row"><span>Allowed</span><strong>${Number(data.memberCount || 0)}</strong></div>
-      <div class="data-row"><span>Already Entered</span><strong>${Number(data.enteredCount || 0)}</strong></div>
-      <p style="margin-top:12px"><strong>${escapeHtml(data.reason || "Entry limit reached.")}</strong></p>`;
-    return;
-  }
-
-  resultEl.classList.add("authorized");
-  resultEl.innerHTML = `
-    <h2>✅ Entry Authorized</h2>
-    <div class="data-row"><span>Wing</span><strong>${escapeHtml(data.wing)}</strong></div>
-    <div class="data-row"><span>Flat</span><strong>${escapeHtml(data.flat)}</strong></div>
-    <div class="data-row"><span>Amount Paid</span><strong>₹${Number(data.amountPaid || 0).toLocaleString("en-IN")}</strong></div>
-    <div class="data-row"><span>Allowed Members</span><strong>${Number(data.memberCount || 0)}</strong></div>
-    <div class="data-row"><span>Already Entered</span><strong>${Number(data.enteredCount || 0)}</strong></div>
-    <div class="data-row"><span>Remaining</span><strong>${Number(data.remaining || 0)}</strong></div>
-    <div style="margin-top:12px">This entry has been recorded.</div>`;
+function showMessage(text) {
+  msgEl.textContent = text;
+  msgEl.classList.remove("hide");
 }
 
-// Google Apps Script returns JSONP. This avoids cross-origin browser restrictions.
+function clearMessage() {
+  msgEl.classList.add("hide");
+}
+
+function clearResult() {
+  resultEl.className = "result hide";
+  resultEl.innerHTML = "";
+}
+
+// JSONP is used because the GitHub Pages site and Apps Script are different origins.
 function api(action, params = {}) {
   return new Promise((resolve, reject) => {
     if (API_URL.includes("PASTE_YOUR")) {
-      reject(new Error("Configure API_URL in app.js first."));
+      reject(new Error("Please configure the Apps Script Web App URL in app.js."));
       return;
     }
 
-    const callback = `apiCallback_${Date.now()}_${++requestCounter}`;
-    const query = new URLSearchParams({ action, callback, ...params });
+    const callback = `entryCallback_${Date.now()}_${++requestCounter}`;
     const script = document.createElement("script");
+    const query = new URLSearchParams({ action, callback, ...params });
+
     const timeout = setTimeout(() => {
       cleanup();
       reject(new Error("Request timed out."));
     }, 15000);
 
-    window[callback] = (data) => {
+    window[callback] = data => {
       cleanup();
       resolve(data);
     };
@@ -106,123 +69,71 @@ function api(action, params = {}) {
   });
 }
 
-async function checkAndRecord(wing, flat) {
-  hideMessage();
-  resetResult();
+function renderDenied(data, reason) {
+  resultEl.className = "result bad";
+  resultEl.innerHTML = `
+    <h2>❌ Entry Not Authorized</h2>
+    <div class="row"><span>Wing</span><strong>${escapeHtml(data.wing || "")}</strong></div>
+    <div class="row"><span>Flat</span><strong>${escapeHtml(data.flat || "")}</strong></div>
+    ${data.occupancy ? `<div class="row"><span>Type</span><strong>${escapeHtml(data.occupancy)}</strong></div>` : ""}
+    <div class="row"><span>Allowed Members</span><strong>${Number(data.memberCount || 0)}</strong></div>
+    <div class="row"><span>Already Entered Today</span><strong>${Number(data.enteredCount || 0)}</strong></div>
+    <div class="row"><span>Remaining Today</span><strong>${Number(data.remaining || 0)}</strong></div>
+    <p style="margin-top:14px"><strong>${escapeHtml(reason)}</strong></p>
+  `;
+}
 
-  if (!wing || !flat) {
-    showMessage("Please provide Wing and Flat Number.");
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  clearMessage();
+  clearResult();
+
+  const wing = wingEl.value.trim();
+  const flat = flatEl.value.trim();
+  const people = Number.parseInt(peopleEl.value, 10);
+
+  if (!wing || !flat || !Number.isInteger(people) || people < 1) {
+    showMessage("Please select a Wing, enter Flat Number, and enter a valid people count.");
     return;
   }
 
-  checkBtn.disabled = true;
-  checkBtn.textContent = "Checking...";
+  button.disabled = true;
+  button.textContent = "Checking...";
 
   try {
-    const data = await api("authorize", { wing, flat });
+    const data = await api("authorize", { wing, flat, people });
+
     if (data.error) throw new Error(data.error);
-    renderResult(data);
-  } catch (err) {
-    showMessage(err.message || "Unable to connect.");
+
+    if (!data.found) {
+      renderDenied(data, "Flat was not found in the selected wing.");
+      return;
+    }
+
+    if (!data.authorized) {
+      renderDenied(data, data.reason || "Entry is not authorized.");
+      return;
+    }
+
+    resultEl.className = "result ok";
+    resultEl.innerHTML = `
+      <h2>✅ Entry Authorized</h2>
+      <div class="row"><span>Wing</span><strong>${escapeHtml(data.wing)}</strong></div>
+      <div class="row"><span>Flat</span><strong>${escapeHtml(data.flat)}</strong></div>
+      <div class="row"><span>Occupancy</span><strong>${escapeHtml(data.occupancy)}</strong></div>
+      <div class="row"><span>Amount Paid</span><strong>₹${Number(data.amountPaid || 0).toLocaleString("en-IN")}</strong></div>
+      <div class="row"><span>Allowed Members</span><strong>${Number(data.memberCount)}</strong></div>
+      <div class="row"><span>People Entering Now</span><strong>${Number(data.peopleEntered)}</strong></div>
+      <div class="row"><span>Total Entered Today</span><strong>${Number(data.enteredCount)}</strong></div>
+      <div class="row"><span>Remaining Today</span><strong>${Number(data.remaining)}</strong></div>
+      <p style="margin-top:14px"><strong>Entry recorded in today's log.</strong></p>
+    `;
+
+    peopleEl.value = "";
+  } catch (error) {
+    showMessage(error.message || "Unable to process the entry.");
   } finally {
-    checkBtn.disabled = false;
-    checkBtn.textContent = "Check Authorization";
+    button.disabled = false;
+    button.textContent = "Check & Authorize";
   }
-}
-
-lookupForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  checkAndRecord(wingEl.value.trim(), flatEl.value.trim());
-});
-
-function parseQr(value) {
-  // Supported QR formats:
-  // 1) A Wing|101
-  // 2) A Wing,101
-  // 3) {"wing":"A Wing","flat":"101"}
-  // 4) A Wing-101
-  try {
-    const obj = JSON.parse(value);
-    if (obj.wing && obj.flat) return { wing: String(obj.wing), flat: String(obj.flat) };
-  } catch (_) {}
-
-  const parts = value.split(/[|,]/).map(x => x.trim());
-  if (parts.length >= 2 && parts[0] && parts[1]) return { wing: parts[0], flat: parts[1] };
-
-  const dash = value.match(/^(.+?)\s*-\s*(\d+)$/);
-  if (dash) return { wing: dash[1].trim(), flat: dash[2].trim() };
-
-  return null;
-}
-
-async function onScanSuccess(decodedText) {
-  const parsed = parseQr(decodedText);
-  if (!parsed) {
-    showMessage("QR found, but it does not contain a valid Wing and Flat number.");
-    return;
-  }
-
-  if (scannerRunning) {
-    await stopScanner();
-  }
-
-  wingEl.value = parsed.wing;
-  flatEl.value = parsed.flat;
-  await checkAndRecord(parsed.wing, parsed.flat);
-}
-
-async function startScanner() {
-  hideMessage();
-  if (scannerRunning) return;
-
-  if (typeof Html5Qrcode === "undefined") {
-    showMessage("QR scanner library is still loading. Please try again.");
-    return;
-  }
-
-  scanner = new Html5Qrcode("reader");
-  try {
-    await scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      onScanSuccess,
-      () => {}
-    );
-    scannerRunning = true;
-  } catch (err) {
-    showMessage("Camera could not be started. Allow camera permission and use HTTPS.");
-  }
-}
-
-async function stopScanner() {
-  if (scanner && scannerRunning) {
-    try { await scanner.stop(); } catch (_) {}
-    try { scanner.clear(); } catch (_) {}
-  }
-  scannerRunning = false;
-  scanner = null;
-}
-
-scanTab.addEventListener("click", async () => {
-  scanTab.classList.add("active");
-  manualTab.classList.remove("active");
-  scannerPanel.classList.remove("hidden");
-  lookupForm.classList.add("hidden");
-  resetResult();
-  await startScanner();
-});
-
-manualTab.addEventListener("click", async () => {
-  manualTab.classList.add("active");
-  scanTab.classList.remove("active");
-  await stopScanner();
-  scannerPanel.classList.add("hidden");
-  lookupForm.classList.remove("hidden");
-  resetResult();
-});
-
-stopScannerBtn.addEventListener("click", stopScanner);
-
-window.addEventListener("load", () => {
-  setTimeout(startScanner, 600);
 });
