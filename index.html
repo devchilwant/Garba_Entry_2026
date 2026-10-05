@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Society Entry Authorization</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
+</head>
+<body>
+<main class="container">
+  <section class="card">
+    <div class="header">
+      <div>
+        <h1>Society Entry</h1>
+        <p>Scan QR or enter flat number to authorize entry.</p>
+      </div>
+      <span class="status-dot"></span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="scanTab">Scan QR</button>
+      <button class="tab" id="manualTab">Manual Entry</button>
+    </div>
+
+    <div id="scannerPanel">
+      <div id="reader"></div>
+      <p class="hint">Point the camera at the flat's QR code.</p>
+      <button type="button" class="secondary" id="stopScannerBtn">Stop Camera</button>
+    </div>
+
+    <form id="lookupForm" class="hidden">
+      <label for="wing">Wing</label>
+      <select id="wing">
+        <option value="">Select Wing</option>
+        <option>A Wing</option><option>B Wing</option><option>C Wing</option>
+        <option>D Wing</option><option>E Wing</option><option>F Wing</option>
+        <option>G Wing</option><option>H Wing</option><option>I Wing</option>
+        <option>J Wing</option>
+      </select>
+
+      <label for="flat">Flat Number</label>
+      <input id="flat" type="text" inputmode="text" placeholder="e.g. 101">
+
+      <button type="submit" id="checkBtn">Check Authorization</button>
+    </form>
+
+    <div id="message" class="message hidden"></div>
+    <div id="result" class="result hidden"></div>
+
+    <div class="event-note">
+      <strong>Entry rule:</strong> Each successful authorization records one member entry.
+      Once the allowed member count is reached, further entries for that flat are rejected.
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
