@@ -111,4 +111,4 @@ The application does NOT reset the main Google Sheet count. It only calculates "
 
 When the next day starts, a new log sheet is automatically created and that day's entered count starts from zero.
 
-No QR code functionality is included in this version.
+No QR code functionality is included in this version. 
