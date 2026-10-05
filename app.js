@@ -1,7 +1,6 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbznlkXmy90QeWI8lv9PMiCb2XzIu4CoSXnV4GWy9h6c6nUf7XFOLhIyI5E8XFP1hcUUrA/exec";
 
 let requestCounter = 0;
-
 document.addEventListener("DOMContentLoaded", () => {
 
     const form = document.getElementById("checkForm");
