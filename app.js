@@ -1,5 +1,5 @@
 // Put your deployed Google Apps Script Web App URL here.
-const API_URL = "PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE";
+const API_URL = "https://script.google.com/macros/s/AKfycbzLKsU6C_DUd6E8RhdaD1Qry9uJmNAvZHxWipUGD3jBW926MmCF8u94N_RTxex0OY8kcw/exec";
 
 let scanner = null;
 let scannerRunning = false;
